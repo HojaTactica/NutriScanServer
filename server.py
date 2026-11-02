@@ -14,7 +14,7 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 
 # Modelo de Gemini
-MODEL = "gemini-3.8-flash"
+MODEL = "gemini-3.5-flash-lite"
 
 
 # =========================================================

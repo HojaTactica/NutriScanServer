@@ -1,3 +1,4 @@
+
 import os
 import json
 import time
@@ -9,107 +10,24 @@ from google.genai import types
 
 app = Flask(__name__)
 
-# Límite máximo de tamaño de la petición
+# Limite maximo de la peticion
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
-
 
 # Modelo de Gemini
 MODEL = "gemini-3.5-flash-lite"
 
 
 # =========================================================
-# HEALTH CHECK
+# PROMPT DE ANALISIS NUTRICIONAL
 # =========================================================
 
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({
-        "status": "NutriScan server funcionando"
-    })
-
-
-# =========================================================
-# ANALIZAR FOTOGRAFÍA
-# =========================================================
-
-@app.route("/analyze", methods=["POST"])
-def analyze():
-
-    # -----------------------------------------------------
-    # COMPROBAR API KEY
-    # -----------------------------------------------------
-
-    api_key = os.environ.get("GEMINI_API_KEY")
-
-    if not api_key:
-        return jsonify({
-            "error": "Falta configurar GEMINI_API_KEY"
-        }), 500
-
-
-    # -----------------------------------------------------
-    # COMPROBAR IMAGEN
-    # -----------------------------------------------------
-
-    if "image" not in request.files:
-        return jsonify({
-            "error": "No se recibió ninguna fotografía"
-        }), 400
-
-
-    photo = request.files["image"]
-
-
-    # -----------------------------------------------------
-    # COMPROBAR FORMATO
-    # -----------------------------------------------------
-
-    if photo.mimetype not in [
-        "image/jpeg",
-        "image/png",
-        "image/webp"
-    ]:
-        return jsonify({
-            "error": "Formato de imagen no compatible"
-        }), 400
-
-
-    try:
-
-        # -------------------------------------------------
-        # LEER IMAGEN
-        # -------------------------------------------------
-
-        image_bytes = photo.read()
-
-        print(
-            "Imagen recibida:",
-            len(image_bytes),
-            "bytes"
-        )
-
-
-        # -------------------------------------------------
-        # CREAR CLIENTE GEMINI
-        # -------------------------------------------------
-
-        client = genai.Client(
-            api_key=api_key
-        )
-
-
-        # -------------------------------------------------
-        # PROMPT
-        # -------------------------------------------------
-
-        
-prompt = """
+PROMPT = """
 Eres el analista nutricional educativo de NutriScan.
 
 Tu trabajo es interpretar etiquetas nutricionales y explicar
-la información de forma clara, detallada, útil y comprensible.
+la informacion de forma clara, detallada, util y comprensible.
 
-Analiza la fotografía y devuelve EXCLUSIVAMENTE un JSON válido
+Analiza la fotografia y devuelve EXCLUSIVAMENTE un JSON valido
 con esta estructura:
 
 {
@@ -130,95 +48,168 @@ con esta estructura:
 REGLAS PARA LEER LA ETIQUETA:
 
 - No inventes datos.
-- Utiliza los valores correspondientes a UNA PORCIÓN.
-- Si la etiqueta presenta valores por porción y por 100 g/ml,
-  utiliza los de la porción.
-- Si solamente presenta valores por 100 g/ml, no los presentes
-  como valores por porción. Aclara esta limitación en el análisis.
+- Utiliza los valores correspondientes a UNA PORCION.
+- Si la etiqueta presenta valores por porcion y por 100 g/ml,
+  utiliza los de la porcion.
+- Si solamente presenta valores por 100 g/ml, aclara esta
+  limitacion en el analisis.
 - No confundas gramos con miligramos.
 - Si un dato no aparece o no es legible, utiliza 0.
-- No confundas azúcares totales con azúcares añadidos.
+- No confundas azucares totales con azucares anadidos.
 - No inventes ingredientes, vitaminas ni minerales.
-- Si no puedes identificar el producto, deja productName vacío.
+- Si no puedes identificar el producto, deja productName vacio.
 
-INSTRUCCIONES PARA EL ANÁLISIS:
+INSTRUCCIONES PARA EL ANALISIS:
 
-El campo "analysis" debe contener un análisis amplio,
-personalizado al producto y redactado en español.
+El campo "analysis" debe contener un analisis amplio,
+personalizado al producto y redactado en espanol.
 
-Organiza el análisis con estos apartados:
+Organiza el analisis con estos apartados:
 
-1. ¿QUÉ ESTÁS CONSUMIENDO?
-Explica qué tipo de producto parece ser y cuáles son
-sus características nutricionales principales.
+1. QUE ESTAS CONSUMIENDO
+
+Explica que tipo de producto parece ser y cuales son
+sus caracteristicas nutricionales principales.
 
 2. ASPECTOS NUTRICIONALES DESTACADOS
-Identifica los nutrientes que más destacan.
-Explica qué significan sus cantidades por porción.
-Diferencia azúcares, grasas, sodio, proteínas y carbohidratos.
-No califiques una cantidad como alta o baja sin contar
-con información suficiente para justificarlo.
 
-3. INGREDIENTES Y SU FUNCIÓN
-Explica la función de los ingredientes que sean visibles
-y reconocibles.
-Señala cuáles merecen atención y por qué.
-No atribuyas efectos que no estén respaldados.
+Identifica los nutrientes que mas destacan.
+Explica que significan sus cantidades por porcion.
+Diferencia azucares, grasas, sodio, proteinas y carbohidratos.
+No califiques una cantidad como alta o baja sin contar
+con informacion suficiente para justificarlo.
+
+3. INGREDIENTES Y SU FUNCION
+
+Explica la funcion de los ingredientes visibles y reconocibles.
+Senala cuales merecen atencion y por que.
+No atribuyas efectos que no esten respaldados.
 
 4. POSIBLES EFECTOS DEL CONSUMO FRECUENTE
-Explica de forma educativa qué consecuencias puede tener
+
+Explica de forma educativa que consecuencias puede tener
 el consumo frecuente de los componentes destacados.
+
 Por ejemplo:
-- Azúcares añadidos y salud dental.
+- Azucares anadidos y salud dental.
 - Exceso de sodio y salud cardiovascular.
-- Cafeína y sueño o nerviosismo.
+- Cafeina y sueno o nerviosismo.
 - Grasas saturadas y salud cardiovascular.
 
-Menciona únicamente los aspectos que realmente correspondan
-a los ingredientes y nutrientes identificados.
-No afirmes que una sola porción causará una enfermedad.
+Menciona solamente los aspectos que correspondan
+a los nutrientes e ingredientes identificados.
+No afirmes que una sola porcion causara una enfermedad.
 
-5. ¿QUÉ PODRÍAS MEJORAR?
-Propón alternativas y hábitos sencillos:
+5. QUE PODRIAS MEJORAR
+
+Propone alternativas y habitos sencillos:
 - Variar las bebidas y elegir agua con frecuencia.
 - Incluir frutas enteras y verduras.
 - Incorporar alimentos variados que aporten fibra,
-  proteínas y otros nutrientes.
+  proteinas y otros nutrientes.
 - Alternar productos similares con distintas composiciones.
 
 Las recomendaciones deben relacionarse con este producto.
 No sugieras dietas restrictivas, saltarse comidas,
-compensar alimentos ni reducir drásticamente la alimentación.
+compensar alimentos ni reducir drasticamente la alimentacion.
 
-6. CONCLUSIÓN
-Resume qué es lo más importante de este producto,
-qué conviene tener en cuenta y cómo consumirlo
-dentro de una alimentación variada.
+6. CONCLUSION
+
+Resume que es lo mas importante de este producto,
+que conviene tener en cuenta y como consumirlo
+dentro de una alimentacion variada.
 
 ESTILO:
 
 - Habla directamente con el usuario.
 - Utiliza un tono cercano, inteligente y educativo.
-- Explica el porqué de cada observación.
-- Evita frases genéricas que podrían aplicarse a cualquier producto.
+- Explica el porque de cada observacion.
+- Evita frases genericas.
 - No exageres riesgos ni asustes al usuario.
 - No diagnostiques enfermedades.
-- No des recomendaciones médicas.
+- No des recomendaciones medicas.
 - No juzgues al usuario por consumir un producto.
-- No afirmes que alguien consume demasiado basándote
-  únicamente en una fotografía.
+- No afirmes que alguien consume demasiado basandote
+  unicamente en una fotografia.
 
 IMPORTANTE:
+
 Si la imagen no contiene una etiqueta nutricional legible,
-indica claramente que no es posible realizar un análisis fiable.
+indica claramente que no es posible realizar un analisis fiable.
 """
 
 
+# =========================================================
+# HEALTH CHECK
+# =========================================================
 
-        # =================================================
-        # INTENTOS DE GEMINI
-        # =================================================
+@app.route("/health", methods=["GET"])
+def health():
 
+    return jsonify({
+        "status": "NutriScan server funcionando"
+    })
+
+
+# =========================================================
+# ANALIZAR FOTOGRAFIA
+# =========================================================
+
+@app.route("/analyze", methods=["POST"])
+def analyze():
+
+    # Comprobar API KEY
+    api_key = os.environ.get("GEMINI_API_KEY")
+
+    if not api_key:
+
+        return jsonify({
+            "error": "Falta configurar GEMINI_API_KEY"
+        }), 500
+
+    # Comprobar imagen
+    if "image" not in request.files:
+
+        return jsonify({
+            "error": "No se recibio ninguna fotografia"
+        }), 400
+
+    photo = request.files["image"]
+
+    # Comprobar formato
+    if photo.mimetype not in [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ]:
+
+        return jsonify({
+            "error": "Formato de imagen no compatible"
+        }), 400
+
+    try:
+
+        # Leer imagen
+        image_bytes = photo.read()
+
+        if not image_bytes:
+
+            return jsonify({
+                "error": "La fotografia esta vacia"
+            }), 400
+
+        print(
+            "Imagen recibida:",
+            len(image_bytes),
+            "bytes"
+        )
+
+        # Crear cliente Gemini
+        client = genai.Client(
+            api_key=api_key
+        )
+
+        # Intentos de Gemini
         max_attempts = 4
 
         for attempt in range(1, max_attempts + 1):
@@ -229,11 +220,7 @@ indica claramente que no es posible realizar un análisis fiable.
                     f"Intento {attempt} de {max_attempts} con Gemini..."
                 )
 
-
-                # -----------------------------------------
-                # LLAMADA A GEMINI
-                # -----------------------------------------
-
+                # Llamada a Gemini
                 response = client.models.generate_content(
 
                     model=MODEL,
@@ -243,40 +230,47 @@ indica claramente que no es posible realizar un análisis fiable.
                             data=image_bytes,
                             mime_type=photo.mimetype
                         ),
-                        prompt
+                        PROMPT
                     ],
 
                     config=types.GenerateContentConfig(
-                        response_mime_type="application/json"
+                        response_mime_type="application/json",
+                        temperature=0.4
                     )
                 )
 
+                print("Gemini respondio correctamente.")
 
-                # -----------------------------------------
-                # RESPUESTA RECIBIDA
-                # -----------------------------------------
+                # Convertir respuesta a JSON
+                result = json.loads(response.text)
 
-                print(
-                    "Gemini respondió correctamente."
-                )
+                # Comprobar estructura
+                required_fields = [
+                    "productName",
+                    "servingSize",
+                    "calories",
+                    "protein",
+                    "carbohydrates",
+                    "fats",
+                    "sugars",
+                    "sodium",
+                    "ingredients",
+                    "vitamins",
+                    "minerals",
+                    "analysis"
+                ]
 
+                for field in required_fields:
 
-                result = json.loads(
-                    response.text
-                )
+                    if field not in result:
 
+                        raise ValueError(
+                            "Falta el campo: " + field
+                        )
 
-                print(
-                    "JSON generado correctamente."
-                )
-
+                print("JSON generado correctamente.")
 
                 return jsonify(result)
-
-
-            # =================================================
-            # ERROR DE GEMINI
-            # =================================================
 
             except Exception as error:
 
@@ -288,11 +282,7 @@ indica claramente que no es posible realizar un análisis fiable.
 
                 print(error_text)
 
-
-                # -----------------------------------------
-                # DETERMINAR SI ES UN ERROR TRANSITORIO
-                # -----------------------------------------
-
+                # Identificar errores temporales
                 temporary_error = (
                     "503" in error_text
                     or "UNAVAILABLE" in error_text
@@ -302,11 +292,7 @@ indica claramente que no es posible realizar un análisis fiable.
                     or "INTERNAL" in error_text
                 )
 
-
-                # -----------------------------------------
-                # SI NO ES TRANSITORIO
-                # -----------------------------------------
-
+                # Si no es temporal
                 if not temporary_error:
 
                     print(
@@ -314,17 +300,11 @@ indica claramente que no es posible realizar un análisis fiable.
                     )
 
                     return jsonify({
-                        "error":
-                            "Gemini rechazó la solicitud.",
-                        "details":
-                            error_text
+                        "error": "Gemini no pudo analizar la imagen.",
+                        "details": error_text
                     }), 500
 
-
-                # -----------------------------------------
-                # SI YA NO QUEDAN INTENTOS
-                # -----------------------------------------
-
+                # Si se agotaron los intentos
                 if attempt == max_attempts:
 
                     print(
@@ -333,44 +313,40 @@ indica claramente que no es posible realizar un análisis fiable.
 
                     return jsonify({
                         "error":
-                            "Gemini está temporalmente ocupado. "
+                            "Gemini esta temporalmente ocupado. "
                             "Intenta nuevamente en unos segundos."
                     }), 503
 
-
-                # -----------------------------------------
-                # ESPERA EXPONENCIAL
-                # -----------------------------------------
-
+                # Espera exponencial
                 wait_time = 2 ** (attempt - 1)
 
                 print(
-                    f"Esperando {wait_time} segundos "
-                    "antes de volver a intentar..."
+                    f"Esperando {wait_time} segundos..."
                 )
 
                 time.sleep(wait_time)
 
-
-    # =====================================================
-    # ERROR GENERAL DEL SERVIDOR
-    # =====================================================
-
     except Exception as error:
 
-        print(
-            "Error general del servidor:"
-        )
-
+        print("Error general del servidor:")
         print(error)
 
-
         return jsonify({
-            "error":
-                "No se pudo analizar la fotografía.",
-            "details":
-                str(error)
+            "error": "No se pudo analizar la fotografia.",
+            "details": str(error)
         }), 500
+
+
+# =========================================================
+# MANEJO DE ARCHIVOS DEMASIADO GRANDES
+# =========================================================
+
+@app.errorhandler(413)
+def file_too_large(error):
+
+    return jsonify({
+        "error": "La imagen supera el limite de 10 MB."
+    }), 413
 
 
 # =========================================================
